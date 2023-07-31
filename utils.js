@@ -7,9 +7,9 @@ const registeredSitesStr = fs.readFileSync(constants.SENSOR_SITES_FILE, 'utf8');
 const registeredSites = JSON.parse(registeredSitesStr);
 console.log(registeredSites);
 
-const commonStr = fs.readFileSync(constants.COMMON_FILE, 'utf8');
-const common = JSON.parse(commonStr);
-console.log(common);
+// const commonStr = fs.readFileSync(constants.COMMON_FILE, 'utf8');
+// const common = JSON.parse(commonStr);
+// console.log(common);
 
 // Errors
 class NotRegisteredError extends Error {
@@ -19,7 +19,10 @@ class NotRegisteredError extends Error {
   }
 }
 
-
+const recordCommonSchema = {
+  "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+  "timestamp": "BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))"
+};
 class SensorContext {
   constructor(siteName, sensorName) {
     if (typeof siteName !== 'string' || typeof sensorName !== 'string')
@@ -40,11 +43,10 @@ class SensorContext {
     this.sensorDesc = this.sensorObject.desc;
 
     // Cache all-column definitions(common part + unique part)
-    this.sensorSchema = Object.assign({}, common.recordCommonSchema, this.sensorObject.schema);
+    this.sensorSchema = Object.assign({}, recordCommonSchema, this.sensorObject.schema);
 
     console.log(`Upload received from ${siteName}.${sensorName}.`);
     console.info(`Init SQL: ${this.getInitSQL()}`);
-    console.info(`Insert SQL: ${this.getPreparedInsertSQL()}`);
   }
   getTableName() { // returns the name of corresponding table in SQLite
     return this.siteName + '_' + this.sensorName;
@@ -55,12 +57,14 @@ class SensorContext {
     }).join(', ');
     console.log(columnsExpression);
 
-    return `CREATE TABLE IF NOT EXISTS ${this.getTableName()} (${columnsExpression});`;
+    return `CREATE TABLE IF NOT EXISTS ${this.getTableName()} (${columnsExpression});` +
+      `CREATE INDEX IF NOT EXISTS ${this.getTableName() + '_timeidx'} ON ${this.getTableName()}(timestamp);`;
   }
-  getPreparedInsertSQL() {
-    const columnNames = Object.keys(this.sensorSchema).join(', ');
-    const placeholders = Object.keys(this.sensorSchema).map(() => '?').join(', ');
-    return `INSERT INTO ${this.getTableName()} (${columnNames}) VALUES (${placeholders})`;
+  getPreparedInsertSQL(data) {
+    // prepared statement for record insertion
+    const columnNames = Object.keys(data).join(', ');
+    const placeholders = Object.keys(data).map(() => '?').join(', ');
+    return `INSERT INTO ${this.getTableName()} (${columnNames}) VALUES (${placeholders});`;
   }
 }
 

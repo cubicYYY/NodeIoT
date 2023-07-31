@@ -1,5 +1,5 @@
 -- A site keeps multiple sensors. Records are stored seperately in another table.
--- This is just a backup mechanism for sensor_sites.json 
+-- This is just a backup mechanism(TODO)
 CREATE TABLE IF NOT EXISTS Sites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

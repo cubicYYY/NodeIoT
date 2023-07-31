@@ -1,0 +1,7 @@
+{
+    "recordCommonSchema": {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "sensor_id": "INTEGER",
+        "timestamp": "BIGINT DEFAULT (strftime('%s', 'now'))"
+    } 
+}

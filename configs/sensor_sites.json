@@ -1,0 +1,32 @@
+{
+  "AAA108": {
+    "desc": "AAA Base, NodeMCU + ESP8266 + DHT22 + [light sensor]",
+    "sensors": {
+      "DHT22": {
+        "desc": "2 digits precision",
+        "schema": {
+          "temperature": "REAL",
+          "humidity": "REAL"
+        }
+      },
+      "light": {
+        "desc": "light sensor",
+        "schema": {
+          "resistance": "REAL"
+        }
+      }
+    }
+  },
+  "YYY": {
+    "desc": "YYY's dormitory, @32-386",
+    "sensors": {
+      "DHT22": {
+        "desc": "",
+        "schema": {
+          "temperature": "REAL",
+          "humidity": "REAL"
+        }
+      }
+    }
+  }
+}

@@ -97,15 +97,11 @@ const { exit } = require('process');
 
     // Update the database
     db.serialize(async () => { // UGLY!UGLY!
-      await promisedQuery("BEGIN")
-        .then(() => {
-          return new Promise(async (resolve, reject) => {
-            await tryInitTable();
-            resolve();
-          });
-        })
+      await new Promise(async (resolve, reject) => {
+        await tryInitTable();
+        resolve();
+      })
         .then(() => { return promisedQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body)) })
-        .then(() => { return promisedQuery("COMMIT") })
         .then(
           () => {
             res.json({

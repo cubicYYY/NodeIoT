@@ -76,15 +76,16 @@ class SensorContext {
 
 // Utils Async
 function serial(asyncFunctions) {
-  return asyncFunctions.reduce(function (functionChain, nextFunction) {
+  return asyncFunctions.reduce(function (functionChain, thenable) {
     return functionChain.then(
-      (previousResult) => nextFunction(previousResult)
+      () => thenable()
     );
   }, Promise.resolve());
 }
 
 module.exports = {
   SensorContext: SensorContext,
+  serial: serial,
   // tryInitTable: tryInitTable,
   // executeQueries: executeQueries
 };

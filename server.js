@@ -1,3 +1,5 @@
+const { rejects } = require('assert');
+const { resolve } = require('path');
 const { exit } = require('process');
 
 (async () => {
@@ -15,7 +17,7 @@ const { exit } = require('process');
   const db = new sqlite3.Database(constants.DB_FILE_NAME);
   const dbInitSQL = fs.readFileSync(constants.INIT_SQL, 'utf8');
 
-
+  // Toolkits
   function promisedQuery(query, params) {
     return new Promise((resolve, reject) => {
       db.run(query, params, function (err) {
@@ -25,13 +27,13 @@ const { exit } = require('process');
     });
   }
 
+  // Create Express application
+  const app = express();
   async function serverInit() {
     await promisedQuery(dbInitSQL);
     console.log("Initialization Finished. Starting server...");
   }
   await serverInit();
-  // Create Express application
-  const app = express();
 
   // Define a route handler for the /upload path
   const UPLOAD_PATH = '/upload/:site/:sensor$'
@@ -69,56 +71,43 @@ const { exit } = require('process');
     const sensor = req.params.sensor;
     let ctx = new utils.SensorContext(site, sensor);
 
-    function executeQueries(queries) { // UNFINISHED
-      // TODO: use this instead of .then chaining
-      // [{sql:"select ?;", params:[1]}]
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          for (let i = 0; i < queries.length; i++) {
-            db.run(queries[i].sql, queries[i].params, function (err) {
-              if (err) {
-                reject(err);
-              }
-            });
-          }
-          resolve();
-        });
-      });
+    // TODO modify prototype of Database
+    function executeTransaction(queries) {
+      // Run a batch of SQL queries as a transaction, rollback if failed
+      // e.g. queries = [{sql:"select ?;", params:[1]}]
+      let batch = [{ sql: "BEGIN", params: [] }, ...queries, { sql: "COMMIT", params: [] }]
+      let results = [];
+      return batch.reduce((chain, query) => chain.then(result => {
+        results.push(result); // save the last result
+        return promisedQuery(query.sql, query.params);
+      }), Promise.resolve())
+        .catch(err => promisedQuery("ROLLBACK", []).then(() => Promise.reject(err)))
+        .then(() => results.slice(2)); // eliminate the first two useless results (Promise.resolve() and BEGIN)
     }
 
-    async function tryInitTable() {
-      if (!ctx.isInited()) {
-        console.log(`Initializing sensor table...`);
-        await promisedQuery(ctx.getInitSQL()); // try to init the table if it doesn't exist
-        ctx.setInited();
-        console.log("Table initialized.");
-      }
-    };
-
     // Update the database
-    db.serialize(async () => { // UGLY!UGLY!
-      await new Promise(async (resolve, reject) => {
-        await tryInitTable();
-        resolve();
-      })
-        .then(() => { return promisedQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body)) })
-        .then(
-          () => {
-            res.json({
-              "ok": true,
-              "msg": ""
-            })
-          })
-        .catch((err) => {
-          console.log("SQL promise failed: ")
-          console.log(err);
-          res.json({
-            "ok": false,
-            "msg": err.message
-          })
+    queries = [];
+    function addQuery(sql, params) {
+      queries.push({ sql: sql, params: params });
+    }
+    if (!ctx.isInited()) {
+      console.log(`Initializing sensor table...`);
+      addQuery(ctx.getInitSQL(), []); // try to init the table if it doesn't exist
+    }
+    addQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body));
+    executeTransaction(queries) // Run each connection asynchronously
+      .then(() => ctx.setInited())
+      .then(() => res.status(200).json({
+        "ok": true,
+        "msg": ""
+      }))
+      .catch((err) => {
+        console.log(err);
+        res.status(500).json({
+          "ok": false,
+          "msg": err.message
         });
-    });
-
+      });
 
   });
 
@@ -136,5 +125,5 @@ const { exit } = require('process');
     console.log(err);
     exit();
   });
-  process.on('exit', () => { db.close(); })
+  process.on('exit', () => { db.close(); console.log("Server closed."); })
 })();

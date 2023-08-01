@@ -1,3 +1,5 @@
+const { exit } = require('process');
+
 (async () => {
   const express = require('express');
   const rateLimit = require('express-rate-limit');
@@ -8,29 +10,26 @@
   const constants = require('./constants.js');
 
   const serverToken = fs.readFileSync(constants.TOKEN_FILE, 'utf8');
-  // Sync run, or block until all SQL before it is executed
-  async function syncRunQuery(sql, params) {
-    return new Promise((resolve, reject) => {
-      const stmt = db.prepare(sql);
-
-      db.run(sql, params, function (err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(this.changes);
-        }
-
-        stmt.finalize();
-        console.log("donesync");
-
-      });
-    });
-  }
 
   // Create a new database connection, and try to init it.
   const db = new sqlite3.Database(constants.DB_FILE_NAME);
   const dbInitSQL = fs.readFileSync(constants.INIT_SQL, 'utf8');
-  await syncRunQuery(dbInitSQL);
+
+
+  function promisedQuery(query, params) {
+    return new Promise((resolve, reject) => {
+      db.run(query, params, function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  }
+
+  async function serverInit() {
+    await promisedQuery(dbInitSQL);
+    console.log("Initialization Finished. Starting server...");
+  }
+  await serverInit();
   // Create Express application
   const app = express();
 
@@ -50,7 +49,7 @@
 
   app.use(UPLOAD_PATH, minuteLimit);
   app.use(UPLOAD_PATH, burstLimit);
-  app.post(UPLOAD_PATH, express.json(), (req, res) => {
+  app.post(UPLOAD_PATH, express.json(), async (req, res) => {
     console.log(req.params);
     // Verify token
     let token = null;
@@ -64,30 +63,67 @@
       res.status(401).send('Invalid token or token is not provided.');
       return;
     }
-    try {
-      const site = req.params.site;
-      const sensor = req.params.sensor;
-      let ctx = new utils.SensorContext(site, sensor);
 
-      // Asynchronously update!
-      db.serialize(() => {
-        db.run(ctx.getInitSQL(), []); // try to init the table if it doesn't exist
-        // TODO: init all tables before inserting!
-        db.run(ctx.getPreparedInsertSQL(req.body), Object.values(req.body)); // insert
-        console.log("inserted!");
-        const response = {
-          "ok": true,
-          "msg": ""
-        };
-        res.json(response);
+    // pre-defined variables for DB operations
+    const site = req.params.site;
+    const sensor = req.params.sensor;
+    let ctx = new utils.SensorContext(site, sensor);
+
+    function executeQueries(queries) { // UNFINISHED
+      // TODO: use this instead of .then chaining
+      // [{sql:"select ?;", params:[1]}]
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          for (let i = 0; i < queries.length; i++) {
+            db.run(queries[i].sql, queries[i].params, function (err) {
+              if (err) {
+                reject(err);
+              }
+            });
+          }
+          resolve();
+        });
       });
-    } catch (err) {
-      const response = {
-        "ok": false,
-        "msg": err.message
-      };
-      res.json(response);
     }
+
+    async function tryInitTable() {
+      if (!ctx.isInited()) {
+        console.log(`Initializing sensor table...`);
+        await promisedQuery(ctx.getInitSQL()); // try to init the table if it doesn't exist
+        ctx.setInited();
+        console.log("Table initialized.");
+      }
+    };
+
+    // Update the database
+    db.serialize(async () => { // UGLY!UGLY!
+      await promisedQuery("BEGIN")
+        .then(() => {
+          return new Promise(async (resolve, reject) => {
+            await tryInitTable();
+            resolve();
+          });
+        })
+        .then(() => { return promisedQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body)) })
+        .then(() => { return promisedQuery("COMMIT") })
+        .then(
+          () => {
+            res.json({
+              "ok": true,
+              "msg": ""
+            })
+          })
+        .catch((err) => {
+          console.log("SQL promise failed: ")
+          console.log(err);
+          res.json({
+            "ok": false,
+            "msg": err.message
+          })
+        });
+    });
+
+
   });
 
   // Handle other requests
@@ -99,5 +135,10 @@
   app.listen(3000, () => {
     console.log('Server listening on port 3000');
   });
-  process.on('uncaughtException', () => { console.log('Server uncaught exception'); });
+  process.on('uncaughtException', (err) => {
+    console.log(`Server uncaught exception: `);
+    console.log(err);
+    exit();
+  });
+  process.on('exit', () => { db.close(); })
 })();

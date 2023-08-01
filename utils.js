@@ -7,6 +7,7 @@ const registeredSitesStr = fs.readFileSync(constants.SENSOR_SITES_FILE, 'utf8');
 const registeredSites = JSON.parse(registeredSitesStr);
 console.log(registeredSites);
 
+let initedCache = {};
 // const commonStr = fs.readFileSync(constants.COMMON_FILE, 'utf8');
 // const common = JSON.parse(commonStr);
 // console.log(common);
@@ -41,31 +42,49 @@ class SensorContext {
     this.siteName = siteName;
     this.sensorObject = registeredSites[siteName].sensors[sensorName];
     this.sensorDesc = this.sensorObject.desc;
+    this._inited = (typeof initedCache[this.getSensorIdentifier()] !== 'undefined');
 
     // Cache all-column definitions(common part + unique part)
     this.sensorSchema = Object.assign({}, recordCommonSchema, this.sensorObject.schema);
 
-    console.log(`Upload received from ${siteName}.${sensorName}.`);
-    console.info(`Init SQL: ${this.getInitSQL()}`);
+    // console.info(`Init SQL: ${this.getInitSQL()}`);
   }
-  getTableName() { // returns the name of corresponding table in SQLite
+  getSensorIdentifier() { // returns the name of corresponding table in SQLite
     return this.siteName + '_' + this.sensorName;
   }
   getInitSQL() {
     const columnsExpression = Object.entries(this.sensorSchema).map(([name, type]) => {
       return `${name} ${type}`;
     }).join(', ');
-    console.log(columnsExpression);
 
-    return `CREATE TABLE IF NOT EXISTS ${this.getTableName()} (${columnsExpression});` +
-      `CREATE INDEX IF NOT EXISTS ${this.getTableName() + '_timeidx'} ON ${this.getTableName()}(timestamp);`;
+    return `CREATE TABLE IF NOT EXISTS ${this.getSensorIdentifier()} (${columnsExpression});` +
+      `CREATE INDEX IF NOT EXISTS ${this.getSensorIdentifier() + '_timeidx'} ON ${this.getSensorIdentifier()}(timestamp);`;
   }
   getPreparedInsertSQL(data) {
     // prepared statement for record insertion
     const columnNames = Object.keys(data).join(', ');
     const placeholders = Object.keys(data).map(() => '?').join(', ');
-    return `INSERT INTO ${this.getTableName()} (${columnNames}) VALUES (${placeholders});`;
+    return `INSERT INTO ${this.getSensorIdentifier()} (${columnNames}) VALUES (${placeholders});`;
+  }
+  isInited() {
+    return this._inited;
+  }
+  setInited() {
+    initedCache[this.getSensorIdentifier()] = true;
   }
 }
 
-module.exports = { SensorContext: SensorContext };
+// Utils Async
+function serial(asyncFunctions) {
+  return asyncFunctions.reduce(function (functionChain, nextFunction) {
+    return functionChain.then(
+      (previousResult) => nextFunction(previousResult)
+    );
+  }, Promise.resolve());
+}
+
+module.exports = {
+  SensorContext: SensorContext,
+  // tryInitTable: tryInitTable,
+  // executeQueries: executeQueries
+};

@@ -72,17 +72,22 @@ const { exit } = require('process');
     let ctx = new utils.SensorContext(site, sensor);
 
     // TODO modify prototype of Database
-    function executeTransaction(queries) {
+    async function executeTransaction(queries) {
       // Run a batch of SQL queries as a transaction, rollback if failed
       // e.g. queries = [{sql:"select ?;", params:[1]}]
       let batch = [{ sql: "BEGIN", params: [] }, ...queries, { sql: "COMMIT", params: [] }]
       let results = [];
-      return batch.reduce((chain, query) => chain.then(result => {
-        results.push(result); // save the last result
-        return promisedQuery(query.sql, query.params);
-      }), Promise.resolve())
-        .catch(err => promisedQuery("ROLLBACK", []).then(() => Promise.reject(err)))
-        .then(() => results.slice(2)); // eliminate the first two useless results (Promise.resolve() and BEGIN)
+      for (const query of batch) { // do each query IN ORDER
+        try {
+          let queryResult = await promisedQuery(query.sql, query.params);
+          results.push(queryResult);
+        } catch (err) {
+          await promisedQuery("ROLLBACK", []);
+          throw err;
+        }
+      }
+      // console.log(results);
+      return results.slice(1, -1); // Eliminate useless results (BEGIN & COMMIT)
     }
 
     // Update the database
@@ -90,25 +95,33 @@ const { exit } = require('process');
     function addQuery(sql, params) {
       queries.push({ sql: sql, params: params });
     }
+
+    // Determine what queries should be run 
+    // (because some are not needed depending on if the database is initialized).
     if (!ctx.isInited()) {
       console.log(`Initializing sensor table...`);
-      addQuery(ctx.getInitSQL(), []); // try to init the table if it doesn't exist
+      addQuery(ctx.getInitSQL(), []); // Try to init the table if it doesn't exist
     }
     addQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body));
-    executeTransaction(queries) // Run each connection asynchronously
-      .then(() => ctx.setInited())
-      .then(() => res.status(200).json({
-        "ok": true,
-        "msg": ""
-      }))
-      .catch((err) => {
+
+    // Run the data record insertion to SQLite, each connection ASYNChronously
+    async function doInsert() {
+      try {
+        await executeTransaction(queries); 
+        await ctx.setInited();
+        await (res.status(200).json({
+          "ok": true,
+          "msg": ""
+        }));
+      } catch (err) {
         console.log(err);
         res.status(500).json({
           "ok": false,
           "msg": err.message
         });
-      });
-
+      };
+    }
+    doInsert();
   });
 
   // Handle other requests

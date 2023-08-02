@@ -1,8 +1,5 @@
-const { rejects } = require('assert');
-const { resolve } = require('path');
-const { exit } = require('process');
-
 (async () => {
+  const { exit } = require('process');
   const express = require('express');
   const rateLimit = require('express-rate-limit');
   const fs = require('fs');
@@ -13,30 +10,7 @@ const { exit } = require('process');
 
   const serverToken = fs.readFileSync(constants.TOKEN_FILE, 'utf8');
 
-  // Create a new database connection, and try to init it.
-  const db = new sqlite3.Database(constants.DB_FILE_NAME);
-  const dbInitSQL = fs.readFileSync(constants.INIT_SQL, 'utf8');
-
-  // Toolkits
-  function promisedQuery(query, params) {
-    return new Promise((resolve, reject) => {
-      db.run(query, params, function (err) {
-        if (err) reject(err);
-        else resolve(this.changes);
-      });
-    });
-  }
-
-  // Create Express application
-  const app = express();
-  async function serverInit() {
-    await promisedQuery(dbInitSQL);
-    console.log("Initialization Finished. Starting server...");
-  }
-  await serverInit();
-
-  // Define a route handler for the /upload path
-  const UPLOAD_PATH = '/upload/:site/:sensor$'
+  // Limiters
   const minuteLimit = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     max: 10, // Limit to 10 requests per minute
@@ -48,6 +22,22 @@ const { exit } = require('process');
     max: 5, // Limit to 5 requests
     message: "Slow down...",
   });
+
+
+  // Create Express application and DB 
+  const app = express();
+  const db = new sqlite3.Database(constants.DB_FILE_NAME);
+
+  // Create a new database connection, and try to init it.
+  const dbInitSQL = fs.readFileSync(constants.INIT_SQL, 'utf8');
+  async function serverInit() {
+    await db.runAsync(dbInitSQL);
+    console.log("Initialization Finished. Starting server...");
+  }
+  await serverInit();
+
+  // Define a route handler for the /upload path
+  const UPLOAD_PATH = '/upload/:site/:sensor$'
 
   app.use(UPLOAD_PATH, minuteLimit);
   app.use(UPLOAD_PATH, burstLimit);
@@ -71,25 +61,6 @@ const { exit } = require('process');
     const sensor = req.params.sensor;
     let ctx = new utils.SensorContext(site, sensor);
 
-    // TODO modify prototype of Database
-    async function executeTransaction(queries) {
-      // Run a batch of SQL queries as a transaction, rollback if failed
-      // e.g. queries = [{sql:"select ?;", params:[1]}]
-      let batch = [{ sql: "BEGIN", params: [] }, ...queries, { sql: "COMMIT", params: [] }]
-      let results = [];
-      for (const query of batch) { // do each query IN ORDER
-        try {
-          let queryResult = await promisedQuery(query.sql, query.params);
-          results.push(queryResult);
-        } catch (err) {
-          await promisedQuery("ROLLBACK", []);
-          throw err;
-        }
-      }
-      // console.log(results);
-      return results.slice(1, -1); // Eliminate useless results (BEGIN & COMMIT)
-    }
-
     // Update the database
     queries = [];
     function addQuery(sql, params) {
@@ -104,24 +75,22 @@ const { exit } = require('process');
     }
     addQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body));
 
-    // Run the data record insertion to SQLite, each connection ASYNChronously
-    async function doInsert() {
-      try {
-        await executeTransaction(queries); 
-        await ctx.setInited();
-        await (res.status(200).json({
-          "ok": true,
-          "msg": ""
-        }));
-      } catch (err) {
-        console.log(err);
-        res.status(500).json({
-          "ok": false,
-          "msg": err.message
-        });
-      };
-    }
-    doInsert();
+    // Run the data record insertion to SQLite, each connection SYNChronously (avoid races)
+    // i.e. We don't want operations from another connection failed because of a transaction being running.
+    try {
+      await db.executeTransaction(queries);
+      await ctx.setInited();
+      await (res.status(200).json({
+        "ok": true,
+        "msg": ""
+      }));
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({
+        "ok": false,
+        "msg": err.message
+      });
+    };
   });
 
   // Handle other requests

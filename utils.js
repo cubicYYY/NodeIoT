@@ -1,6 +1,7 @@
 // This module is designed to have NO SIDE EFFECTS!
 // So no SQL sentence should be complete/executed.
 const fs = require('fs');
+const sqlite3 = require('sqlite3').verbose();
 const constants = require('./constants.js');
 
 const registeredSitesStr = fs.readFileSync(constants.SENSOR_SITES_FILE, 'utf8');
@@ -83,9 +84,38 @@ function serial(asyncFunctions) {
   }, Promise.resolve());
 }
 
+// Expanded Toolkits
+sqlite3.Database.prototype.runAsync = function (query, params) {
+  return new Promise((resolve, reject) => {
+    this.run(query, params, function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+}
+
+
+sqlite3.Database.prototype.executeTransaction = async function (queries) {
+  // Run a batch of SQL queries as a transaction, rollback if failed
+  // e.g. queries = [{sql:"select ?;", params:[1]}]
+  let batch = [{ sql: "BEGIN", params: [] }, ...queries, { sql: "COMMIT", params: [] }]
+  let results = [];
+  for (const query of batch) { // do each query IN ORDER
+    try {
+      let queryResult = await this.runAsync(query.sql, query.params);
+      results.push(queryResult);
+    } catch (err) {
+      await db.runAsync("ROLLBACK", []);
+      throw err;
+    }
+  }
+  // console.log(results);
+  return results.slice(1, -1); // Eliminate useless results (BEGIN & COMMIT)
+}
+
+console.log("Custom SQLite functions injected.");
+
 module.exports = {
   SensorContext: SensorContext,
-  serial: serial,
-  // tryInitTable: tryInitTable,
-  // executeQueries: executeQueries
+  serial: serial,  
 };

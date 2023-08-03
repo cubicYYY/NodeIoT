@@ -1,5 +1,3 @@
-// This module is designed to have NO SIDE EFFECTS!
-// So no SQL sentence should be complete/executed.
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const constants = require('./constants.js');
@@ -25,6 +23,9 @@ const recordCommonSchema = {
   "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
   "timestamp": "BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))"
 };
+
+// This class is designed to have NO SIDE EFFECTS!
+// So no SQL sentence should be complete/executed.
 class SensorContext {
   constructor(siteName, sensorName) {
     if (typeof siteName !== 'string' || typeof sensorName !== 'string')
@@ -53,13 +54,18 @@ class SensorContext {
   getSensorIdentifier() { // returns the name of corresponding table in SQLite
     return this.siteName + '_' + this.sensorName;
   }
+
+  getIndexName() { // returns the name of corresponding table in SQLite
+    return this.getSensorIdentifier() + '_timeidx';
+  }
+
   getInitSQL() {
     const columnsExpression = Object.entries(this.sensorSchema).map(([name, type]) => {
       return `${name} ${type}`;
     }).join(', ');
 
     return `CREATE TABLE IF NOT EXISTS ${this.getSensorIdentifier()} (${columnsExpression});` +
-      `CREATE INDEX IF NOT EXISTS ${this.getSensorIdentifier() + '_timeidx'} ON ${this.getSensorIdentifier()}(timestamp);`;
+      `CREATE INDEX IF NOT EXISTS ${this.getIndexName()} ON ${this.getSensorIdentifier()}(timestamp);`;
   }
   getPreparedInsertSQL(data) {
     // prepared statement for record insertion
@@ -105,7 +111,7 @@ sqlite3.Database.prototype.executeTransaction = async function (queries) {
       let queryResult = await this.runAsync(query.sql, query.params);
       results.push(queryResult);
     } catch (err) {
-      await db.runAsync("ROLLBACK", []);
+      await this.runAsync("ROLLBACK", []);
       throw err;
     }
   }
@@ -117,5 +123,5 @@ console.log("Custom SQLite functions injected.");
 
 module.exports = {
   SensorContext: SensorContext,
-  serial: serial,  
+  serial: serial,
 };

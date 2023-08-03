@@ -39,9 +39,7 @@
   // Define a route handler for the /upload path
   const UPLOAD_PATH = '/upload/:site/:sensor$'
 
-  app.use(UPLOAD_PATH, minuteLimit);
-  app.use(UPLOAD_PATH, burstLimit);
-  app.post(UPLOAD_PATH, express.json(), async (req, res) => {
+  app.post(UPLOAD_PATH, minuteLimit, burstLimit, express.json(), async (req, res) => {
     console.log(req.params);
     // Verify token
     let token = null;

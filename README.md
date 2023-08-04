@@ -1,18 +1,39 @@
 # Simple Toy IoT Platform
-
 ## Introduction
-
-## Configuration & Usage
+A simple IoT platform.  
+Collect data received from sensors, tracking environment states of a lab/site.  
 
 ## Installation
+- Server(Host)  
+  1. `npm ci`  
+  2. `node server.js`  
 
+- Client(Hardware)  
+  1. Connect to the server (Ethernet cables / WiFi modules)  
+  2. Sent data by HTTP! (Maybe WebSocket in the future?)  
+
+
+## Usage
 ### Authentication  
 You should authenticate yourself by a token to access the API.  
-`?token=<token>` or set it in HTTP header:  
+`?token=<token>` or pass it via HTTP header:  
 `X-Upload-Token: <token>`  
 
 ### Configuration
-Constants and paths can be found in `constant.js`.
+A configuration file with extension name `.json` is under `config` folder; otherwise, it is under the root folder.  
+#### Environment Variables Override
+You can override environment variables in runtime by setting key-value pairs in `ENV.json`. 
+
+#### Constants
+Constants and paths can be found in `constants.js`.  
+**Paths mentioned in thid documentation are default values in `constants.js`. Ofcourse, you can change them, so the paths may vary in your environment.**  
+
+#### Sites Definition
+Edit `sensor_sites.json` to define custom columns of each sensor (depending on their hardware functionalities).  
+Note: A "site" is a group of sensors. 
+
+#### Recorded Data
+Data is saved in the `data.sqlite` file by SQLite. So Remember to keep it safe!  
 
 #### Sites Structure Definitions
 In `./configs/sensor_sites.json` by default.  
@@ -54,6 +75,7 @@ Example:
 
 ## API
 
+Common path prefix: `/api`, will be included in the paths provided below.  
 **Note: Data Format**
 We'll mention some timely used data formats here.   
 + `Result`
@@ -68,8 +90,14 @@ We'll mention some timely used data formats here.
 TODO
 
 ### Add/Update Sensor Data
-`POST` `/upload/<Site Name>/<Sensor Name>?...`  
-- Usage:  
+`POST` `/api/upload/<Site Name>/<Sensor Name>`  
+- Parameters
+    None (POST body only)  
+
+- Return 
+    `Result` (where message is the affected record ID)
+
+- Usage  
     Only accepts requests with HTTP header `Content-Type: application/json`, data is passed as a json in HTTP body.  
     You can specified the custom columns in the sites structure definition file mentioned above.  
     ```json
@@ -86,14 +114,20 @@ TODO
     }
     ```
 
-- Return format: 
-    `Result` (where message is the affected record ID)
 
 ### Query Sensor Data
-TODO
+`GET` `/api/query/<Site Name>/<Sensor Name>?...`
+TODO  
+- Parameters
+  - `...`
+
+- Return
+  
+- Usage
+    
 
 ### Modify Sensor Data
-TODO
+Not supported.  
 
 ### Delete Sensor Data
-TODO
+Not supported.  

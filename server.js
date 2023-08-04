@@ -28,6 +28,8 @@
   const app = express();
   const db = new sqlite3.Database(constants.DB_FILE_NAME);
 
+  const apiRouter = express.Router();
+
   // Create a new database connection, and try to init it.
   const dbInitSQL = fs.readFileSync(constants.INIT_SQL, 'utf8');
   async function serverInit() {
@@ -39,7 +41,7 @@
   // Define a route handler for the /upload path
   const UPLOAD_PATH = '/upload/:site/:sensor$'
 
-  app.post(UPLOAD_PATH, minuteLimit, burstLimit, express.json(), async (req, res) => {
+  apiRouter.post(UPLOAD_PATH, minuteLimit, burstLimit, express.json(), async (req, res) => {
     console.log(req.params);
     // Verify token
     let token = null;
@@ -90,6 +92,10 @@
       });
     };
   });
+
+  // Paths
+
+  app.use("/api", apiRouter);
 
   // Handle other requests
   app.use((req, res) => {

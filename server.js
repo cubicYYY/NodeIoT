@@ -38,11 +38,10 @@
   }
   await serverInit();
 
-  // Define a route handler for the /upload path
-  const UPLOAD_PATH = '/upload/:site/:sensor$'
-
-  apiRouter.post(UPLOAD_PATH, minuteLimit, burstLimit, express.json(), async (req, res) => {
-    console.log(req.params);
+  //------MIDDLEWARES------
+  // Auth middleware
+  function needAuth(req, res, next) {
+    console.log(req.params); // !debug only
     // Verify token
     let token = null;
     if (typeof req.headers['x-upload-token'] === 'string') {
@@ -55,7 +54,20 @@
       res.status(401).send('Invalid token or token is not provided.');
       return;
     }
+    next();
+  }
 
+  // Log middleware
+  function logger(req, res, next) {
+    // console.log(req);
+    next();
+  }
+
+  //------MAIN LOGICS------
+  // Upload Sensor Data
+  const UPLOAD_PATH = '/upload/:site/:sensor$'
+
+  apiRouter.post(UPLOAD_PATH, minuteLimit, burstLimit, needAuth, express.json(), async (req, res) => {
     // pre-defined variables for DB operations
     const site = req.params.site;
     const sensor = req.params.sensor;
@@ -71,9 +83,9 @@
     // (because some are not needed depending on if the database is initialized).
     if (!ctx.isInited()) {
       console.log(`Initializing sensor table...`);
-      addQuery(ctx.getInitSQL(), []); // Try to init the table if it doesn't exist
+      addQuery(ctx.initSQL(), []); // Try to init the table if it doesn't exist
     }
-    addQuery(ctx.getPreparedInsertSQL(req.body), Object.values(req.body));
+    addQuery(ctx.preparedInsertSQL(req.body), Object.values(req.body));
 
     // Run the data record insertion to SQLite, each connection SYNChronously (avoid races)
     // i.e. We don't want operations from another connection failed because of a transaction being running.
@@ -93,11 +105,37 @@
     };
   });
 
-  // Paths
+  // Query Sensor Data
+  // ! fetch all data by default, which CAN BE EXTREMELY SLOW
+  const QUERY_PATH = '/query/:site/:sensor$'
+  apiRouter.get(QUERY_PATH, minuteLimit, burstLimit, needAuth, express.json(), async (req, res) => {
+    // pre-defined variables for DB operations
+    const site = req.params.site;
+    const sensor = req.params.sensor;
+    let ctx = new utils.SensorContext(site, sensor);
 
-  app.use("/api", apiRouter);
+    // Fetch the database
+    db.all(ctx.allRecords(), async (error, rows) => {
+      if (error) {
+        console.log(err);
+        res.status(500).json({
+          "ok": false,
+          "msg": err.message
+        });
+      }
+      res.status(200).json({
+        "ok": true,
+        "msg": rows
+      });
+    });
 
-  // Handle other requests
+  });
+
+  // Load paths into the server
+
+  app.use("/api", logger, apiRouter);
+
+  // Handle other requests (fallback)
   app.use((req, res) => {
     res.status(404).send("404 Hello, world! YYY's simple IoT platform.");
   });

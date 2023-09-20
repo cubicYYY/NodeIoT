@@ -44,40 +44,48 @@ class SensorContext {
     this.siteName = siteName;
     this.sensorObject = registeredSites[siteName].sensors[sensorName];
     this.sensorDesc = this.sensorObject.desc;
-    this._inited = (typeof initedCache[this.getSensorIdentifier()] !== 'undefined');
+    this._inited = (typeof initedCache[this.sensorIdentifier()] !== 'undefined');
 
     // Cache all-column definitions(common part + unique part)
     this.sensorSchema = Object.assign({}, recordCommonSchema, this.sensorObject.schema);
 
     // console.info(`Init SQL: ${this.getInitSQL()}`);
   }
-  getSensorIdentifier() { // returns the name of corresponding table in SQLite
+  
+  sensorIdentifier() { // returns the name of corresponding table in SQLite
     return this.siteName + '_' + this.sensorName;
   }
 
-  getIndexName() { // returns the name of corresponding table in SQLite
-    return this.getSensorIdentifier() + '_timeidx';
+  indexName() { // returns the name of corresponding table in SQLite
+    return this.sensorIdentifier() + '_timeidx';
   }
 
-  getInitSQL() {
-    const columnsExpression = Object.entries(this.sensorSchema).map(([name, type]) => {
+  columnsExpression() { // returns the name of corresponding data columns of this sensor in SQLite
+    return Object.entries(this.sensorSchema).map(([name, type]) => {
       return `${name} ${type}`;
     }).join(', ');
-
-    return `CREATE TABLE IF NOT EXISTS ${this.getSensorIdentifier()} (${columnsExpression});` +
-      `CREATE INDEX IF NOT EXISTS ${this.getIndexName()} ON ${this.getSensorIdentifier()}(timestamp);`;
   }
-  getPreparedInsertSQL(data) {
+
+  allRecords() {
+    return `SELECT * FROM ${this.sensorIdentifier()};`;
+  }
+
+  initSQL() {
+    return `CREATE TABLE IF NOT EXISTS ${this.sensorIdentifier()} (${this.columnsExpression()});` +
+      `CREATE INDEX IF NOT EXISTS ${this.indexName()} ON ${this.sensorIdentifier()}(timestamp);`;
+  }
+
+  preparedInsertSQL(data) {
     // prepared statement for record insertion
     const columnNames = Object.keys(data).join(', ');
     const placeholders = Object.keys(data).map(() => '?').join(', ');
-    return `INSERT INTO ${this.getSensorIdentifier()} (${columnNames}) VALUES (${placeholders});`;
+    return `INSERT INTO ${this.sensorIdentifier()} (${columnNames}) VALUES (${placeholders});`;
   }
   isInited() {
     return this._inited;
   }
   setInited() {
-    initedCache[this.getSensorIdentifier()] = true;
+    initedCache[this.sensorIdentifier()] = true;
   }
 }
 

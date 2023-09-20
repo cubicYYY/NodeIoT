@@ -1,7 +1,9 @@
 # Simple Toy IoT Platform
 ## Introduction
 A simple IoT platform.  
-Collect data received from sensors, tracking environment states of a lab/site.  
+Main goals:  
++ Collect data received from sensors, tracking environment states of a lab/site
++ Publish the correct state of a device via API (where the device polls) to control it 
 
 ## Installation
 - Server(Host)  
@@ -85,6 +87,12 @@ We'll mention some timely used data formats here.
         "msg": "", // Any value, optional message
     }
     ```
+
+### Rate Limits
+
+Followed limits are applied to the API. You can modify the corresponding middleware in `server.js` to custom them.
++ 10 reqs/min
++ 5 reqs/3secs
 
 ### Define/Update a Site Structure
 TODO

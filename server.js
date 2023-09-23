@@ -97,7 +97,15 @@
     // pre-defined variables for DB operations
     const site = req.params.site;
     const sensor = req.params.sensor;
-    let ctx = new utils.SensorContext(site, sensor);
+    let ctx;
+    try { ctx = new utils.SensorContext(site, sensor); } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        "ok": false,
+        "msg": err.message
+      });
+      return;
+    }
 
     // Update the database
     queries = [];
@@ -142,7 +150,15 @@
     // pre-defined variables for DB operations
     const site = req.params.site;
     const sensor = req.params.sensor;
-    let ctx = new utils.SensorContext(site, sensor);
+    let ctx;
+    try { ctx = new utils.SensorContext(site, sensor); } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        "ok": false,
+        "msg": err.message
+      });
+      return;
+    }
 
     // Fetch the database
     db.all(ctx.allRecords(), async (err, rows) => {

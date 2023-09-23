@@ -43,7 +43,7 @@ class SensorContext {
     this.siteName = siteName;
     this.sensorObject = registeredSites[siteName].sensors[sensorName];
     this.sensorDesc = this.sensorObject.desc;
-    this._inited = (typeof initedCache[this.sensorIdentifier()] !== 'undefined');
+    this._inited = false;
 
     // Cache all-column definitions(common part + unique part)
     this.sensorSchema = Object.assign({}, recordCommonSchema, this.sensorObject.schema);
@@ -132,4 +132,5 @@ console.info("Custom SQLite functions injected.");
 module.exports = {
   SensorContext: SensorContext,
   serial: serial,
+  registeredSites: registeredSites,
 };

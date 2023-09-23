@@ -18,7 +18,7 @@ Main goals:
 ## Usage
 
 ### Hardware Client
-You need to 
+You need to post sensor data to the server by your own. There're some examples in the `hardware_examples` directory.  
 
 ### Authentication  
 You should authenticate yourself by a token to access the API.  
@@ -99,7 +99,8 @@ Followed limits are applied to the API. You can modify the corresponding middlew
 + 5 reqs/3secs
 
 ### Define/Update a Site Structure
-TODO
+Initialization is automatically done.    
+**You need to manually add it currently.**
 
 ### Add/Update Sensor Data
 `POST` `/api/upload/<Site Name>/<Sensor Name>`  

@@ -35,6 +35,31 @@
   async function serverInit() {
     await db.runAsync(dbInitSQL);
     console.info("Initialization Finished. Starting server...");
+
+    // Sites table initialization
+    for (const name in utils.registeredSites) {
+      const desc = name.desc;
+
+      // Check if a row with the same name already exists in the database
+      db.get('SELECT * FROM Sites WHERE name = ?', [name], (err, row) => {
+        if (err) {
+          console.error(err);
+        } else {
+          if (!row) {
+            // Insert the name and desc columns into the database
+            db.run('INSERT INTO Sites (name, desc) VALUES (?, ?)', [name, desc], (err) => {
+              if (err) {
+                console.error(err);
+              } else {
+                console.log(`Inserted ${name} into the database.`);
+              }
+            });
+          } else {
+            // console.log(`Row with name ${name} already exists in the database.`);
+          }
+        }
+      });
+    };
   }
   await serverInit();
 
@@ -86,13 +111,17 @@
       console.info(`Initializing sensor table...`);
       addQuery(ctx.initSQL(), []); // Try to init the table if it doesn't exist
     }
-    addQuery(ctx.preparedInsertSQL(req.body), Object.values(req.body));
+
 
     // Run the data record insertion to SQLite, each connection SYNChronously (avoid races)
     // i.e. We don't want operations from another connection failed because of a transaction being running.
     try {
       await db.executeTransaction(queries);
       await ctx.setInited();
+      queries = [];
+      console.log(req.body);
+      addQuery(ctx.preparedInsertSQL(req.body), Object.values(req.body));
+      await db.executeTransaction(queries);
       await (res.status(200).json({
         "ok": true,
         "msg": ""
@@ -116,18 +145,19 @@
     let ctx = new utils.SensorContext(site, sensor);
 
     // Fetch the database
-    db.all(ctx.allRecords(), async (error, rows) => {
-      if (error) {
-        console.error(err);
+    db.all(ctx.allRecords(), async (err, rows) => {
+      if (err) {
         res.status(500).json({
           "ok": false,
-          "msg": error.message
+          "msg": err.message
+        });
+      } else {
+        res.status(200).json({
+          "ok": true,
+          "msg": rows
         });
       }
-      res.status(200).json({
-        "ok": true,
-        "msg": rows
-      });
+
     });
 
   });

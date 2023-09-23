@@ -1,3 +1,4 @@
 node_modules/
+states/
 *.sqlite
 token

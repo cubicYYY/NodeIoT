@@ -6,10 +6,8 @@ const registeredSitesStr = fs.readFileSync(constants.SENSOR_SITES_FILE, 'utf8');
 const registeredSites = JSON.parse(registeredSitesStr);
 console.log(registeredSites);
 
+// Mark all registered sensors
 let initedCache = {};
-// const commonStr = fs.readFileSync(constants.COMMON_FILE, 'utf8');
-// const common = JSON.parse(commonStr);
-// console.log(common);
 
 // Errors
 class NotRegisteredError extends Error {
@@ -19,6 +17,7 @@ class NotRegisteredError extends Error {
   }
 }
 
+// Common columns in SQLite for all type records
 const recordCommonSchema = {
   "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
   "timestamp": "BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))"
@@ -99,6 +98,7 @@ function serial(asyncFunctions) {
 }
 
 // Expanded Toolkits
+// Injected into sqlite3 API
 sqlite3.Database.prototype.runAsync = function (query, params) {
   return new Promise((resolve, reject) => {
     this.run(query, params, function (err) {
@@ -127,7 +127,7 @@ sqlite3.Database.prototype.executeTransaction = async function (queries) {
   return results.slice(1, -1); // Eliminate useless results (BEGIN & COMMIT)
 }
 
-console.log("Custom SQLite functions injected.");
+console.info("Custom SQLite functions injected.");
 
 module.exports = {
   SensorContext: SensorContext,

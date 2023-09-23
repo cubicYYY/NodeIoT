@@ -3,7 +3,7 @@
 A simple IoT platform.  
 Main goals:  
 + Collect data received from sensors, tracking environment states of a lab/site
-+ Publish the correct state of a device via API (where the device polls) to control it 
++ Publish the correct state of a device(sensor) via API (where the device polls) to control it 
 
 ## Installation
 - Server(Host)  
@@ -16,6 +16,10 @@ Main goals:
 
 
 ## Usage
+
+### Hardware Client
+You need to 
+
 ### Authentication  
 You should authenticate yourself by a token to access the API.  
 `?token=<token>` or pass it via HTTP header:  
@@ -81,12 +85,12 @@ Common path prefix: `/api`, will be included in the paths provided below.
 **Note: Data Format**
 We'll mention some timely used data formats here.   
 + `Result`
-    ```json
-    {
-        "ok" : true, // Boolean value, operation successful or not
-        "msg": "", // Any value, optional message
-    }
-    ```
+  ```json
+  {
+      "ok" : true, // Boolean value, operation successful or not
+      "msg": "", // Any value, optional message
+  }
+  ```
 
 ### Rate Limits
 
@@ -100,39 +104,47 @@ TODO
 ### Add/Update Sensor Data
 `POST` `/api/upload/<Site Name>/<Sensor Name>`  
 - Parameters
-    None (POST body only)  
+  None (POST body only)  
 
 - Return 
-    `Result` (where message is the affected record ID)
+  `Result` (where message is the affected record ID)
 
 - Usage  
-    Only accepts requests with HTTP header `Content-Type: application/json`, data is passed as a json in HTTP body.  
-    You can specified the custom columns in the sites structure definition file mentioned above.  
-    ```json
-    {
-        "id": 11, // Optional,
-        // if provided -> overwrite old data
-        // otherwise insert a new data record
-        // ID is only unique between records of a specific sensor!
+  Only accepts requests with HTTP header `Content-Type: application/json`, data is passed as a json in HTTP body.  
+  You can specified the custom columns in the sites structure definition file mentioned above.  
+  ```json
+  {
+      "id": 11, // Optional,
+      // if provided -> overwrite old data
+      // otherwise insert a new data record
+      // ID is only unique between records of a specific sensor!
 
-        "timestamp": 114514, // Optional, default by the server time
-        // belows are customed columns
-        "temperature": 25.5,
-        "humidity": 88.5
-    }
-    ```
+      "timestamp": 114514, // Optional, default by the server time
+      // belows are customed columns
+      "temperature": 25.5,
+      "humidity": 88.5
+  }
+  ```
 
 
 ### Query Sensor Data
 `GET` `/api/query/<Site Name>/<Sensor Name>?...`
 TODO  
 - Parameters
-  - `...`
+  - `recent` (Optional): Only return latest records, total=`recent` rows TODO
 
 - Return
-  
+  `Result` (where message is the record data)
 - Usage
     
+### Publish Sensore State (TODO)
+`GET` `/api/publish/<Site Name>/<Sensor Name>?...`
+- Return
+  `Result`
+### Fetch(Polling) Sensore State (TODO)
+`GET` `/api/poll/<Site Name>/<Sensor Name>?...`
+- Return
+  `Result` (where message is the current state)
 
 ### Modify Sensor Data
 Not supported.  

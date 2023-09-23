@@ -26,7 +26,7 @@
 
   // Create Express application and DB 
   const app = express();
-  const db = new sqlite3.Database(constants.DB_FILE_NAME);
+  const db = new sqlite3.Database(constants.DB_FILE);
 
   const apiRouter = express.Router();
 
@@ -34,14 +34,14 @@
   const dbInitSQL = fs.readFileSync(constants.INIT_SQL, 'utf8');
   async function serverInit() {
     await db.runAsync(dbInitSQL);
-    console.log("Initialization Finished. Starting server...");
+    console.info("Initialization Finished. Starting server...");
   }
   await serverInit();
 
   //------MIDDLEWARES------
   // Auth middleware
   function needAuth(req, res, next) {
-    console.log(req.params); // !debug only
+    console.debug(req.params); // !debug only
     // Verify token
     let token = null;
     if (typeof req.headers['x-upload-token'] === 'string') {
@@ -82,7 +82,7 @@
     // Determine what queries should be run 
     // (because some are not needed depending on if the database is initialized).
     if (!ctx.isInited()) {
-      console.log(`Initializing sensor table...`);
+      console.info(`Initializing sensor table...`);
       addQuery(ctx.initSQL(), []); // Try to init the table if it doesn't exist
     }
     addQuery(ctx.preparedInsertSQL(req.body), Object.values(req.body));
@@ -97,7 +97,7 @@
         "msg": ""
       }));
     } catch (err) {
-      console.log(err);
+      console.error(err);
       res.status(500).json({
         "ok": false,
         "msg": err.message
@@ -117,7 +117,7 @@
     // Fetch the database
     db.all(ctx.allRecords(), async (error, rows) => {
       if (error) {
-        console.log(err);
+        console.error(err);
         res.status(500).json({
           "ok": false,
           "msg": err.message
@@ -142,12 +142,12 @@
 
   // Start the server
   app.listen(3000, () => {
-    console.log('Server listening on port 3000');
+    console.info('Server listening on port 3000');
   });
   process.on('uncaughtException', (err) => {
-    console.log(`Server uncaught exception: `);
-    console.log(err);
+    console.error(`Server uncaught exception: `);
+    console.error(err);
     exit();
   });
-  process.on('exit', () => { db.close(); console.log("Server closed."); })
+  process.on('exit', () => { db.close(); console.info("Server closed."); })
 })();

@@ -42,6 +42,7 @@
   // Auth middleware
   function needAuth(req, res, next) {
     console.debug(req.params); // !debug only
+    console.debug(req.query); // !debug only
     // Verify token
     let token = null;
     if (typeof req.headers['x-upload-token'] === 'string') {
@@ -120,7 +121,7 @@
         console.error(err);
         res.status(500).json({
           "ok": false,
-          "msg": err.message
+          "msg": error.message
         });
       }
       res.status(200).json({

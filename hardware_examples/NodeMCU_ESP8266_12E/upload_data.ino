@@ -52,10 +52,10 @@ void uploadJSON(String httpRequestData) {
     Serial.println(httpRequestData);
     WiFiClient client;
     HTTPClient http;
-    http.addHeader("Content-Type", "application/json");
     String serverPath = API + "?token=" + TOKEN;
     // Your Domain name with URL path or IP address with path
     http.begin(client, serverPath.c_str());
+    http.addHeader("Content-Type", "application/json");
 
     // If you need Node-RED/server authentication, insert user and password below
     //http.setAuthorization("REPLACE_WITH_SERVER_USERNAME", "REPLACE_WITH_SERVER_PASSWORD");

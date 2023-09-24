@@ -11,7 +11,7 @@ int LEDpin = 2; // For fun
 
 const char* ssid     = "<Your WiFi SSID>";         // The SSID (name) of the Wi-Fi network you want to connect to
 const char* password = "<Your WiFi Password>";     // The password of the Wi-Fi network
-String serverName = "https://<Your Server>/api/upload/<Site Name>/<Sensor Name>"; // Host of your NodeIoT platform
+String API = "https://<Your Server>/api/upload/<Site Name>/<Sensor Name>"; // Host of your NodeIoT platform
 String TOKEN = "<Your Server Token>";
 
 #define DHTdataPin D2 // Defines pin number to which the sensor is connected
@@ -56,7 +56,7 @@ void uploadJSON(String httpRequestData) {
     // Your Domain name with URL path or IP address with path
     http.begin(client, serverPath.c_str());
     http.addHeader("Content-Type", "application/json");
-
+    
     // If you need Node-RED/server authentication, insert user and password below
     //http.setAuthorization("REPLACE_WITH_SERVER_USERNAME", "REPLACE_WITH_SERVER_PASSWORD");
       
@@ -77,19 +77,37 @@ void uploadJSON(String httpRequestData) {
     http.end();
 }
 // the loop function runs over and over again forever
+int sensor_cnt = 0;
+double total_t=0;
+double total_h=0;
 void loop() {
-  int readData = MyDHT22.read(DHTdataPin);
-  float t = MyDHT22.readTemperature(); // Gets the values of the temperature
-  float h = MyDHT22.readHumidity(); // Gets the values of the humidity
-
-  DynamicJsonDocument doc(1024);
-  doc["temperature"] = t;
-  doc["humidity"] = h;
-  String json_data;
-  serializeJson(doc, json_data);
+  if (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
+    tryToConnect();
+  }
   
-  uploadJSON(json_data);
+  int readData = MyDHT22.read(DHTdataPin);
+  double t = MyDHT22.readTemperature(); // Gets the values of the temperature
+  double h = MyDHT22.readHumidity(); // Gets the values of the humidity
+  sensor_cnt++;
+  total_t+=t;
+  total_h+=h;
 
+  Serial.print(sensor_cnt);Serial.print("   ");
+  Serial.print(t);Serial.print("   ");
+  Serial.println(h);
+    
+  if (sensor_cnt >= 15) {
+    DynamicJsonDocument doc(1024);
+    doc["temperature"] = total_t / sensor_cnt;
+    doc["humidity"] = total_h / sensor_cnt;
+    String json_data;
+    serializeJson(doc, json_data);
+    uploadJSON(json_data);
+    sensor_cnt=0;
+    total_t=0;
+    total_h=0;
+  }
+  
   digitalWrite(LEDpin, HIGH);   // turn the LED on (HIGH is the voltage level)
   delay(1000);               // wait for a second
   digitalWrite(LEDpin, LOW);    // turn the LED off by making the voltage LOW

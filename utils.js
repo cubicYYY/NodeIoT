@@ -69,6 +69,12 @@ class SensorContext {
     return `SELECT * FROM ${this.sensorIdentifier()};`;
   }
 
+  // Newest `number` records
+  recentRecords(number) {
+    number = parseInt(number);
+    return `SELECT * FROM ${this.sensorIdentifier()} ORDER BY id DESC LIMIT ${number};`;
+  }
+
   initSQL() {
     return `CREATE TABLE IF NOT EXISTS ${this.sensorIdentifier()} (${this.columnsExpression()});` +
       `CREATE INDEX IF NOT EXISTS ${this.indexName()} ON ${this.sensorIdentifier()}(timestamp);`;

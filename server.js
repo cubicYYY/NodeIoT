@@ -160,8 +160,8 @@
       return;
     }
 
-    // Fetch the database
-    db.all(ctx.allRecords(), async (err, rows) => {
+    // Fetch the database, ONLY the newest 25000 rows
+    db.all(ctx.recentRecords(25000), async (err, rows) => {
       if (err) {
         res.status(500).json({
           "ok": false,
